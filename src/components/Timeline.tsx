@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Clock, Bookmark, Trash2, Play, Edit3, X, Check, Plus, Thermometer } from 'lucide-react';
 import useSimulationStore from '../store/useSimulationStore';
 import useSimulation from '../hooks/useSimulation';
@@ -19,7 +19,7 @@ export const Timeline: React.FC = () => {
   } = useSimulationStore();
 
   const { goToStep, isRunning } = useSimulation();
-  const [hoveredSnapshot, setHoveredSnapshot] = useState<string | null>(null);
+  const [activeSnapshotId, setActiveSnapshotId] = useState<string | null>(null);
   const [editingSnapshot, setEditingSnapshot] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editNotes, setEditNotes] = useState('');
@@ -29,7 +29,47 @@ export const Timeline: React.FC = () => {
     snapshotId: '',
     snapshotName: '',
   });
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const clearHideTimeout = useCallback(() => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const delayedHide = useCallback(() => {
+    clearHideTimeout();
+    hideTimeoutRef.current = setTimeout(() => {
+      if (!editingSnapshot) {
+        setActiveSnapshotId(null);
+      }
+    }, 150);
+  }, [clearHideTimeout, editingSnapshot]);
+
+  const handleMouseEnter = (snapshotId: string) => {
+    clearHideTimeout();
+    if (!editingSnapshot) {
+      setActiveSnapshotId(snapshotId);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    if (!editingSnapshot) {
+      delayedHide();
+    }
+  };
+
+  const handlePopoverMouseEnter = () => {
+    clearHideTimeout();
+  };
+
+  const handlePopoverMouseLeave = () => {
+    if (!editingSnapshot) {
+      delayedHide();
+    }
+  };
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -37,12 +77,15 @@ export const Timeline: React.FC = () => {
         if (editingSnapshot) {
           handleCancelEdit();
         }
-        setHoveredSnapshot(null);
+        setActiveSnapshotId(null);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [editingSnapshot]);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      clearHideTimeout();
+    };
+  }, [editingSnapshot, clearHideTimeout]);
 
   const handleTimelineClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (isRunning) return;
@@ -55,7 +98,7 @@ export const Timeline: React.FC = () => {
   };
 
   const handleSnapshotClick = (snapshot: typeof snapshots[0]) => {
-    if (isRunning) return;
+    if (isRunning || editingSnapshot) return;
     if (snapshot.step < temperatureHistory.length) {
       goToStep(snapshot.step);
     }
@@ -65,6 +108,7 @@ export const Timeline: React.FC = () => {
     e.stopPropagation();
     e.preventDefault();
     setEditingSnapshot(snapshot.id);
+    setActiveSnapshotId(snapshot.id);
     setEditName(snapshot.name || `第 ${snapshot.step} 步`);
     setEditNotes(snapshot.notes || '');
     setEditKeyTemps(snapshot.keyTemperatures ? [...snapshot.keyTemperatures] : []);
@@ -75,6 +119,7 @@ export const Timeline: React.FC = () => {
     setEditName('');
     setEditNotes('');
     setEditKeyTemps([]);
+    setActiveSnapshotId(null);
   };
 
   const handleSaveEdit = async (snapshotId: string, e: React.MouseEvent) => {
@@ -88,6 +133,7 @@ export const Timeline: React.FC = () => {
       await api.snapshots.update(snapshotId, updates);
       updateSnapshot(snapshotId, updates);
       setEditingSnapshot(null);
+      setActiveSnapshotId(null);
     } catch (error) {
       console.error('更新快照失败:', error);
     }
@@ -123,7 +169,7 @@ export const Timeline: React.FC = () => {
       await api.snapshots.delete(deleteConfirm.snapshotId);
       removeSnapshot(deleteConfirm.snapshotId);
       setDeleteConfirm({ isOpen: false, snapshotId: '', snapshotName: '' });
-      setHoveredSnapshot(null);
+      setActiveSnapshotId(null);
     } catch (error) {
       console.error('删除快照失败:', error);
     }
@@ -159,6 +205,8 @@ export const Timeline: React.FC = () => {
           ref={popoverRef}
           className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-80 z-30 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
+          onMouseEnter={handlePopoverMouseEnter}
+          onMouseLeave={handlePopoverMouseLeave}
         >
           <div className="px-4 py-3 bg-slate-700/50 border-b border-slate-600">
             <div className="flex items-center justify-between">
@@ -267,6 +315,8 @@ export const Timeline: React.FC = () => {
         ref={popoverRef}
         className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 bg-slate-800 border border-slate-600 rounded-xl shadow-2xl w-72 z-20 overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        onMouseEnter={handlePopoverMouseEnter}
+        onMouseLeave={handlePopoverMouseLeave}
       >
         <div className="px-4 py-3 bg-slate-700/50 border-b border-slate-600">
           <div className="flex items-center justify-between">
@@ -370,29 +420,19 @@ export const Timeline: React.FC = () => {
             <div
               key={snapshot.id}
               className={`absolute top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 border-slate-900 cursor-pointer transition-all hover:scale-125 flex items-center justify-center ${
-                hoveredSnapshot === snapshot.id ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 z-10' : ''
+                activeSnapshotId === snapshot.id ? 'ring-2 ring-white ring-offset-2 ring-offset-slate-900 z-10' : ''
               } ${getSnapshotColor(snapshot.step)}`}
               style={{ left: `calc(${(snapshot.step / totalSteps) * 100}% - 10px)` }}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!editingSnapshot) {
-                  handleSnapshotClick(snapshot);
-                }
+                handleSnapshotClick(snapshot);
               }}
-              onMouseEnter={() => {
-                if (!editingSnapshot) {
-                  setHoveredSnapshot(snapshot.id);
-                }
-              }}
-              onMouseLeave={() => {
-                if (!editingSnapshot) {
-                  setHoveredSnapshot(null);
-                }
-              }}
+              onMouseEnter={() => handleMouseEnter(snapshot.id)}
+              onMouseLeave={handleMouseLeave}
             >
               <Play className="w-2.5 h-2.5 text-white" fill="white" />
 
-              {(hoveredSnapshot === snapshot.id || editingSnapshot === snapshot.id) && (
+              {activeSnapshotId === snapshot.id && (
                 renderSnapshotPopover(snapshot)
               )}
             </div>

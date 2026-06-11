@@ -38,17 +38,16 @@ export default function Home() {
   }, [setMaterials, setExperiments, setFavorites]);
 
   useEffect(() => {
-    if (currentExperimentId) {
-      const loadSnapshots = async () => {
-        try {
-          const snapshots = await api.snapshots.getByExperiment(currentExperimentId);
-          setSnapshots(snapshots);
-        } catch (error) {
-          console.error('加载快照失败:', error);
-        }
-      };
-      loadSnapshots();
-    }
+    const loadSnapshots = async () => {
+      try {
+        const experimentId = currentExperimentId || 'default';
+        const snapshots = await api.snapshots.getByExperiment(experimentId);
+        setSnapshots(snapshots);
+      } catch (error) {
+        console.error('加载快照失败:', error);
+      }
+    };
+    loadSnapshots();
   }, [currentExperimentId, setSnapshots]);
 
   return (
