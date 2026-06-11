@@ -76,6 +76,11 @@ export const snapshotsApi = {
       method: 'POST',
       body: JSON.stringify(snapshot),
     }),
+  update: (id: string, updates: Partial<TemperatureSnapshot>) =>
+    request<TemperatureSnapshot>(`/snapshots/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    }),
   delete: (id: string) =>
     request<void>(`/snapshots/${id}`, {
       method: 'DELETE',

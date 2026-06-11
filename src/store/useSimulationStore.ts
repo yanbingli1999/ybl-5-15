@@ -15,7 +15,7 @@ interface SimulationState {
   currentStep: number;
   currentTemperature: number[][];
   temperatureHistory: number[][][];
-  
+
   grid: GridConfig;
   boundaryConditions: BoundaryConditions;
   materialId: string;
@@ -30,20 +30,20 @@ interface SimulationState {
   brushSize: number;
   brushTemperature: number;
   drawMode: 'heat' | 'erase' | 'none';
-  
+
   snapshots: TemperatureSnapshot[];
   experiments: ExperimentConfig[];
   favorites: ExperimentResult[];
-  
+
   currentExperimentId: string | null;
   hoveredCell: { x: number; y: number } | null;
-  
+
   setMode: (mode: SimulationMode) => void;
   setCurrentStep: (step: number) => void;
   setCurrentTemperature: (temp: number[][]) => void;
   addTemperatureToHistory: (temp: number[][]) => void;
   clearHistory: () => void;
-  
+
   setGrid: (grid: GridConfig) => void;
   setBoundaryConditions: (bc: BoundaryConditions) => void;
   setMaterialId: (id: string) => void;
@@ -60,15 +60,16 @@ interface SimulationState {
   setBrushTemperature: (temp: number) => void;
   setDrawMode: (mode: 'heat' | 'erase' | 'none') => void;
   setTempRange: (min: number, max: number) => void;
-  
+
   setSnapshots: (snapshots: TemperatureSnapshot[]) => void;
   addSnapshot: (snapshot: TemperatureSnapshot) => void;
+  updateSnapshot: (id: string, updates: Partial<TemperatureSnapshot>) => void;
   removeSnapshot: (id: string) => void;
   setExperiments: (experiments: ExperimentConfig[]) => void;
   setFavorites: (favorites: ExperimentResult[]) => void;
   setCurrentExperimentId: (id: string | null) => void;
   setHoveredCell: (cell: { x: number; y: number } | null) => void;
-  
+
   reset: () => void;
 }
 
@@ -99,7 +100,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   currentStep: 0,
   currentTemperature: createEmptyTemperature(DEFAULT_GRID),
   temperatureHistory: [],
-  
+
   grid: DEFAULT_GRID,
   boundaryConditions: DEFAULT_BC,
   materialId: 'copper',
@@ -114,14 +115,14 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   brushSize: 2,
   brushTemperature: 100,
   drawMode: 'heat',
-  
+
   snapshots: [],
   experiments: [],
   favorites: [],
-  
+
   currentExperimentId: null,
   hoveredCell: null,
-  
+
   setMode: (mode) => set({ mode }),
   setCurrentStep: (step) => set({ currentStep: step }),
   setCurrentTemperature: (temp) => set({ currentTemperature: temp }),
@@ -130,7 +131,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
       temperatureHistory: [...state.temperatureHistory, temp],
     })),
   clearHistory: () => set({ temperatureHistory: [], currentStep: 0 }),
-  
+
   setGrid: (grid) =>
     set({
       grid,
@@ -167,11 +168,17 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setBrushTemperature: (temp) => set({ brushTemperature: temp }),
   setDrawMode: (mode) => set({ drawMode: mode }),
   setTempRange: (min, max) => set({ minTemp: min, maxTemp: max }),
-  
+
   setSnapshots: (snapshots) => set({ snapshots }),
   addSnapshot: (snapshot) =>
     set((state) => ({
       snapshots: [...state.snapshots, snapshot],
+    })),
+  updateSnapshot: (id, updates) =>
+    set((state) => ({
+      snapshots: state.snapshots.map(s =>
+        s.id === id ? { ...s, ...updates } : s
+      ),
     })),
   removeSnapshot: (id) =>
     set((state) => ({
@@ -181,7 +188,7 @@ export const useSimulationStore = create<SimulationState>((set, get) => ({
   setFavorites: (favorites) => set({ favorites }),
   setCurrentExperimentId: (id) => set({ currentExperimentId: id }),
   setHoveredCell: (cell) => set({ hoveredCell: cell }),
-  
+
   reset: () =>
     set((state) => ({
       mode: 'idle',

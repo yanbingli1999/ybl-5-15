@@ -38,6 +38,12 @@ export interface ExperimentConfig {
   timeStep: number;
 }
 
+export interface KeyTemperaturePoint {
+  label: string;
+  value: number;
+  position?: { x: number; y: number };
+}
+
 export interface TemperatureSnapshot {
   id: string;
   experimentId: string;
@@ -45,6 +51,8 @@ export interface TemperatureSnapshot {
   timestamp: number;
   temperatureData: number[][];
   name?: string;
+  notes?: string;
+  keyTemperatures?: KeyTemperaturePoint[];
 }
 
 export interface ExperimentResult {
